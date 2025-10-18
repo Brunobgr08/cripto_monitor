@@ -1,0 +1,62 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+docs/
+*.md
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Dependencies
+.m2/
+.lein-*
+.nrepl-*
+.rebel_readline_history
+
+# Build artifacts
+target/
+.cpcache/
+*.jar
+
+# Development
+dev/
+.repl/
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Backups
+backups/
+*.sql
+*.dump
+
+# Temporary files
+tmp/
+temp/
+*.tmp

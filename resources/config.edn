@@ -1,0 +1,71 @@
+{:app {:name "Cripto Monitor"
+        :version "1.0.0"
+        :port #long #or [#env PORT 3000]
+        :host #or [#env HOST "localhost"]}
+
+ :database {:url #or [#env DATABASE_URL "jdbc:postgresql://localhost:5432/cripto_monitor_dev?user=dev_user&password=dev_pass"]
+            :host #or [#env DATABASE_HOST "localhost"]
+            :port #long #or [#env DATABASE_PORT 5432]
+            :name #or [#env DATABASE_NAME "cripto_monitor_dev"]
+            :user #or [#env DATABASE_USER "dev_user"]
+            :password #or [#env DATABASE_PASSWORD "dev_pass"]
+            :pool {:minimum-idle 2
+                   :maximum-pool-size 10
+                   :connection-timeout #long #or [#env DATABASE_CONNECTION_TIMEOUT 30000]
+                   :idle-timeout #long #or [#env DATABASE_IDLE_TIMEOUT 600000]
+                   :max-lifetime #long #or [#env DATABASE_MAX_LIFETIME 1800000]}}
+
+ :redis {:url #or [#env REDIS_URL "redis://localhost:6379"]
+         :host #or [#env REDIS_HOST "localhost"]
+         :port #long #or [#env REDIS_PORT 6379]
+         :timeout #long #or [#env REDIS_TIMEOUT 5000]
+         :pool {:max-total 8
+                :max-idle 8
+                :min-idle 0}}
+
+ :logging {:level #keyword #or [#env LOG_LEVEL :info]
+           :appenders {:console {:enabled? true}
+                       :file {:enabled? true
+                              :path "logs/app.log"}}}
+
+ :apis {:coingecko {:base-url #or [#env COINGECKO_BASE_URL "https://api.coingecko.com/api/v3"]
+                    :api-key #env COINGECKO_API_KEY
+                    :rate-limit {:requests-per-minute #long #or [#env COINGECKO_RATE_LIMIT_RPM 50]
+                                 :burst-limit #long #or [#env COINGECKO_RATE_LIMIT_BURST 10]}}
+
+        :binance {:base-url #or [#env BINANCE_BASE_URL "https://api.binance.com/api/v3"]
+                  :api-key #env BINANCE_API_KEY
+                  :secret-key #env BINANCE_SECRET_KEY
+                  :rate-limit {:requests-per-minute #long #or [#env BINANCE_RATE_LIMIT_RPM 1200]
+                               :burst-limit #long #or [#env BINANCE_RATE_LIMIT_BURST 100]}}}
+
+ :collection {:interval-seconds #long #or [#env COLLECTION_INTERVAL_SECONDS 30]
+              :coins ["bitcoin" "ethereum" "solana" "cardano" "polkadot"]
+              :retry {:max-attempts #long #or [#env COLLECTION_RETRY_MAX_ATTEMPTS 3]
+                      :backoff-ms #long #or [#env COLLECTION_RETRY_BACKOFF_MS 1000]}}
+
+ :alerts {:check-interval-seconds #long #or [#env ALERTS_CHECK_INTERVAL_SECONDS 60]
+          :throttle-minutes #long #or [#env ALERTS_THROTTLE_MINUTES 5]
+          :notification {:webhook {:url #env WEBHOOK_URL
+                                   :timeout-ms #long #or [#env WEBHOOK_TIMEOUT_MS 5000]
+                                   :headers {}}
+                         :slack {:webhook-url #env SLACK_WEBHOOK_URL
+                                 :channel #or [#env SLACK_CHANNEL "#alerts"]
+                                 :username #or [#env SLACK_USERNAME "Cripto Monitor"]}
+                         :discord {:webhook-url #env DISCORD_WEBHOOK_URL}
+                         :email {:enabled? false
+                                 :smtp-host #env SMTP_HOST
+                                 :smtp-port #long #or [#env SMTP_PORT 587]
+                                 :smtp-user #env SMTP_USER
+                                 :smtp-password #env SMTP_PASSWORD}
+                         :sms {:enabled? false}}}
+
+ :websocket {:port #long #or [#env WEBSOCKET_PORT 3001]
+             :max-connections #long #or [#env WEBSOCKET_MAX_CONNECTIONS 100]
+             :heartbeat-interval #long #or [#env WEBSOCKET_HEARTBEAT_INTERVAL 30]}
+
+ :frontend {:api-base-url #or [#env FRONTEND_API_BASE_URL "http://localhost:3000"]
+            :websocket-url #or [#env FRONTEND_WEBSOCKET_URL "ws://localhost:3000/ws"]
+            :port #long #or [#env FRONTEND_PORT 8080]}
+
+ :health {:timeout-ms #long #or [#env HEALTH_CHECK_TIMEOUT_MS 5000]}}
