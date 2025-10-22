@@ -53,7 +53,7 @@ cripto-monitor/
         com.taoensso/timbre {:mvn/version "6.3.1"}}}
 ```
 
-### ✅ Issue 2: Configuração do Banco de Dados
+### ✅ Issue 2: Configuração do Banco de Dados - **COMPLETA**
 
 **Duração**: 4 dias
 **Prioridade**: Alta

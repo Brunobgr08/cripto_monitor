@@ -1,3 +1,4 @@
+# ===== CLOJURE =====
 pom.xml
 pom.xml.asc
 *.jar
@@ -12,3 +13,94 @@ pom.xml.asc
 .lein-failures
 .nrepl-port
 .cpcache/
+.rebel_readline_history
+
+# ===== CLOJURESCRIPT / SHADOW-CLJS =====
+# Compiled JavaScript files
+public/js/main.js
+public/js/manifest.edn
+public/js/cljs-runtime/
+.shadow-cljs/
+out/
+resources/public/js/
+
+# ===== NODE.JS / NPM =====
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn-integrity
+# Note: package-lock.json should be committed for consistent builds
+
+# ===== IDE / EDITORS =====
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.emacs.d/
+.vim/
+
+# ===== OS =====
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ===== LOGS =====
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ===== ENVIRONMENT / SECRETS =====
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.production
+
+# ===== DATABASE =====
+# *.sql
+*.dump
+*.sqlite
+*.sqlite3
+*.db
+backups/
+data/
+
+# ===== DOCKER =====
+.docker/
+docker-compose.override.yml
+
+# ===== TEMPORARY FILES =====
+tmp/
+temp/
+*.tmp
+*.temp
+.cache/
+
+# ===== BUILD ARTIFACTS =====
+dist/
+build/
+target/
+out/
+
+# ===== TESTING / COVERAGE =====
+.nyc_output/
+coverage/
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# ===== REPL / DEVELOPMENT =====
+.nrepl-history
+.socket-repl-port
+.rebel_readline_history
