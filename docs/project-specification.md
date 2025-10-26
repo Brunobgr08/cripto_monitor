@@ -98,7 +98,7 @@ CREATE INDEX idx_price_history_coin_time ON price_history(coin_id, collected_at 
 CREATE INDEX idx_price_history_collected_at ON price_history(collected_at DESC);
 ```
 
-### ✅ Issue 3: Cliente API Externa
+### ✅ Issue 3: Cliente API Externa - **COMPLETA**
 
 **Duração**: 5 dias
 **Prioridade**: Alta
