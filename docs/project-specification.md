@@ -131,7 +131,7 @@ CREATE INDEX idx_price_history_collected_at ON price_history(collected_at DESC);
   )
 ```
 
-### ✅ Issue 4: Sistema de Coleta de Dados
+### ✅ Issue 4: Sistema de Coleta de Dados **COMPLETA**
 
 **Duração**: 6 dias
 **Prioridade**: Alta
