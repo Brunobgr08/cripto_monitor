@@ -238,7 +238,7 @@ CREATE INDEX idx_price_history_collected_at ON price_history(collected_at DESC);
 ;; POST /api/system/collect - Forçar coleta de dados
 ```
 
-### ✅ Issue 7: Sistema de Alertas
+### ✅ Issue 7: Sistema de Alertas - **COMPLETA**
 
 **Duração**: 6 dias
 **Prioridade**: Média
