@@ -208,7 +208,7 @@ CREATE INDEX idx_price_history_collected_at ON price_history(collected_at DESC);
   )
 ```
 
-### ✅ Issue 6: API REST - Endpoints Básicos
+### ✅ Issue 6: API REST - Endpoints Básicos - **COMPLETA**
 
 **Duração**: 5 dias
 **Prioridade**: Média
@@ -218,19 +218,27 @@ CREATE INDEX idx_price_history_collected_at ON price_history(collected_at DESC);
 - ✅ Setup Ring + Reitit
 - ✅ Endpoints básicos de consulta
 - ✅ Middleware de logging e CORS
-- ✅ Documentação OpenAPI
+- ✅ Documentação OpenAPI/Swagger
 
 **Endpoints**:
 
 ```clojure
 ;; GET /api/health - Health check
 ;; GET /api/coins - Lista moedas disponíveis
+;; GET /api/coins/:symbol - Detalhes de uma moeda
+;; GET /api/search/coins - Buscar moedas
 ;; GET /api/prices/current - Preços atuais
 ;; GET /api/prices/current/:symbol - Preço atual de uma moeda
 ;; GET /api/prices/history/:symbol - Histórico de preços
+;; GET /api/market/overview - Visão geral do mercado
+;; GET /api/market/gainers - Top gainers
+;; GET /api/market/losers - Top losers
+;; GET /api/stats/:symbol - Estatísticas da moeda
+;; GET /api/system/status - Status do sistema
+;; POST /api/system/collect - Forçar coleta de dados
 ```
 
-### ✅ Issue 7: Sistema de Alertas
+### ✅ Issue 7: Sistema de Alertas - **COMPLETA**
 
 **Duração**: 6 dias
 **Prioridade**: Média

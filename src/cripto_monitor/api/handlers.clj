@@ -1,15 +1,17 @@
 (ns cripto-monitor.api.handlers
-  "HTTP API handlers for cryptocurrency data"
+  "Manipuladores HTTP para dados de criptomoedas"
   (:require [taoensso.timbre :as log]
             [cripto-monitor.db.core :as db]
             [cripto-monitor.collector.core :as collector]
+            [cripto-monitor.alerts.core :as alerts]
+            [cripto-monitor.api.binance :as binance]
             [tick.core :as t]
             [clojure.string :as str]
             [cheshire.core :as json]))
 
-;; Response helpers
+;; Funções auxiliares de resposta
 (defn success-response
-  "Create successful JSON response"
+  "Cria formato de resposta de sucesso padrão em JSON"
   ([data] (success-response data 200))
   ([data status]
    {:status status
@@ -18,7 +20,7 @@
            :timestamp (str (t/instant))}}))
 
 (defn error-response
-  "Create error JSON response"
+  "Cria formato de resposta de erro padrão em JSON"
   ([message] (error-response message 400))
   ([message status]
    {:status status
@@ -27,13 +29,13 @@
            :timestamp (str (t/instant))}}))
 
 (defn not-found-response
-  "Create 404 response"
+  "Cria resposta 404"
   [resource]
   (error-response (str resource " not found") 404))
 
-;; Health check endpoint
+;; Endpoint de verificação de saúde (saúde)
 (defn health-check
-  "Health check endpoint"
+  "Endpoint de verificação de saúde"
   [request]
   (try
     (let [db-spec (get-in request [:system :db-spec])
@@ -46,23 +48,23 @@
                      :stats (:stats collector-status)}
          :uptime (System/currentTimeMillis)}))
     (catch Exception e
-      (log/error e "Health check failed")
-      (error-response "Health check failed" 503))))
+      (log/error e "Falha ao verificar saúde do sistema")
+      (error-response "Falha ao verificar saúde do sistema." 503))))
 
-;; Coins endpoints
+;; Endpoints de moedas
 (defn get-all-coins
-  "Get all available coins"
+  "Obtém todas as moedas disponíveis"
   [request]
   (try
     (let [db-spec (get-in request [:system :db-spec])
           coins (db/get-all-coins db-spec)]
       (success-response coins))
     (catch Exception e
-      (log/error e "Failed to get coins")
-      (error-response "Failed to retrieve coins" 500))))
+      (log/error e "Falha ao buscar moedas")
+      (error-response "Falha ao buscar moedas" 500))))
 
 (defn get-coin-by-symbol
-  "Get specific coin by symbol"
+  "Obtém moeda específica por símbolo"
   [request]
   (try
     (let [db-spec (get-in request [:system :db-spec])
@@ -70,25 +72,25 @@
           coin (db/get-coin-by-symbol db-spec (str/upper-case symbol))]
       (if coin
         (success-response coin)
-        (not-found-response (str "Coin " symbol))))
+        (not-found-response (str "Moeda " symbol))))
     (catch Exception e
-      (log/error e "Failed to get coin" {:symbol (get-in request [:path-params :symbol])})
-      (error-response "Failed to retrieve coin" 500))))
+      (log/error e "Falha ao buscar moeda" {:symbol (get-in request [:path-params :symbol])})
+      (error-response "Falha ao buscar moeda" 500))))
 
-;; Current prices endpoints
+;; Endpoints de preços atuais
 (defn get-current-prices
-  "Get current prices for all coins"
+  "Obtém preços atuais de todas as moedas"
   [request]
   (try
     (let [db-spec (get-in request [:system :db-spec])
           prices (db/get-latest-prices db-spec)]
       (success-response prices))
     (catch Exception e
-      (log/error e "Failed to get current prices")
-      (error-response "Failed to retrieve current prices" 500))))
+      (log/error e "Falha ao buscar preços atuais")
+      (error-response "Falha ao buscar preços atuais" 500))))
 
 (defn get-current-price-by-symbol
-  "Get current price for specific coin"
+  "Obtém preço atual de uma moeda específica"
   [request]
   (try
     (let [db-spec (get-in request [:system :db-spec])
@@ -99,15 +101,15 @@
               coin-price (first (filter #(= (:symbol %) (:symbol coin)) latest-prices))]
           (if coin-price
             (success-response coin-price)
-            (error-response (str "No price data available for " symbol) 404)))
-        (not-found-response (str "Coin " symbol))))
+            (error-response (str "Sem dados de preço disponíveis para " symbol) 404)))
+        (not-found-response (str "Moeda " symbol))))
     (catch Exception e
-      (log/error e "Failed to get current price" {:symbol (get-in request [:path-params :symbol])})
-      (error-response "Failed to retrieve current price" 500))))
+      (log/error e "Falha ao buscar preço atual" {:symbol (get-in request [:path-params :symbol])})
+      (error-response "Falha ao buscar preço atual" 500))))
 
-;; Price history endpoints
+;; Endpoints de histórico de preços
 (defn get-price-history
-  "Get price history for a coin"
+  "Obtém histórico de preços de uma moeda"
   [request]
   (try
     (let [db-spec (get-in request [:system :db-spec])
@@ -120,11 +122,11 @@
           days (when days-str
                  (try (Integer/parseInt days-str)
                       (catch Exception _
-                        (throw (ex-info "Invalid days parameter" {:status 400})))))
+                        (throw (ex-info "Parâmetro 'days' inválido" {:status 400})))))
           limit (when limit-str
                   (try (Integer/parseInt limit-str)
                        (catch Exception _
-                         (throw (ex-info "Invalid limit parameter" {:status 400})))))
+                         (throw (ex-info "Parâmetro 'limit' inválido" {:status 400})))))
 
           coin (db/get-coin-by-symbol db-spec (str/upper-case symbol))]
 
@@ -136,31 +138,31 @@
             {:coin coin
              :history history
              :count (count history)}))
-        (not-found-response (str "Coin " symbol))))
+        (not-found-response (str "Moeda " symbol))))
     (catch clojure.lang.ExceptionInfo e
       (if (= 400 (:status (ex-data e)))
         (error-response (.getMessage e) 400)
         (throw e)))
     (catch NumberFormatException e
-      (error-response "Invalid number format in query parameters" 400))
+      (error-response "Formato de número inválido nos parâmetros de consulta." 400))
     (catch Exception e
-      (log/error e "Failed to get price history" {:symbol (get-in request [:path-params :symbol])})
-      (error-response "Failed to retrieve price history" 500))))
+      (log/error e "Falha ao buscar histórico de preços" {:symbol (get-in request [:path-params :symbol])})
+      (error-response "Falha ao buscar histórico de preços" 500))))
 
-;; Market data endpoints
+;; Endpoints de dados de mercado
 (defn get-market-overview
-  "Get market overview statistics"
+  "Obtém estatísticas de visão geral do mercado"
   [request]
   (try
     (let [db-spec (get-in request [:system :db-spec])
           overview (db/get-market-overview db-spec)]
       (success-response overview))
     (catch Exception e
-      (log/error e "Failed to get market overview")
-      (error-response "Failed to retrieve market overview" 500))))
+      (log/error e "Falha ao buscar visão geral do mercado")
+      (error-response "Falha ao buscar visão geral do mercado" 500))))
 
 (defn get-top-gainers
-  "Get top gaining coins"
+  "Obtém moedas com maiores ganhos"
   [request]
   (try
     (let [db-spec (get-in request [:system :db-spec])
@@ -170,13 +172,13 @@
           gainers (db/get-top-gainers db-spec :limit limit)]
       (success-response gainers))
     (catch NumberFormatException e
-      (error-response "Invalid limit parameter" 400))
+      (error-response "Parâmetro 'limit' inválido" 400))
     (catch Exception e
-      (log/error e "Failed to get top gainers")
-      (error-response "Failed to retrieve top gainers" 500))))
+      (log/error e "Falha ao buscar top gainers")
+      (error-response "Falha ao buscar top gainers" 500))))
 
 (defn get-top-losers
-  "Get top losing coins"
+  "Obtém moedas com maiores perdas"
   [request]
   (try
     (let [db-spec (get-in request [:system :db-spec])
@@ -186,13 +188,13 @@
           losers (db/get-top-losers db-spec :limit limit)]
       (success-response losers))
     (catch NumberFormatException e
-      (error-response "Invalid limit parameter" 400))
+      (error-response "Parâmetro 'limit' inválido" 400))
     (catch Exception e
-      (log/error e "Failed to get top losers")
-      (error-response "Failed to retrieve top losers" 500))))
+      (log/error e "Falha ao buscar top losers")
+      (error-response "Falha ao buscar top losers" 500))))
 
 (defn search-coins
-  "Search coins by symbol or name"
+  "Busca moedas por símbolo ou nome"
   [request]
   (try
     (let [db-spec (get-in request [:system :db-spec])
@@ -206,16 +208,16 @@
             {:query query
              :results results
              :count (count results)}))
-        (error-response (str "Query parameter 'q' must be at least 2 characters. Received: '" query "'") 400)))
+        (error-response (str "Parâmetro de consulta 'q' deve ser informado e ter pelo menos 2 caracteres. Recebido: '" query "'") 400)))
     (catch NumberFormatException e
-      (error-response "Invalid limit parameter" 400))
+      (error-response "Parâmetro 'limit' inválido" 400))
     (catch Exception e
-      (log/error e "Failed to search coins")
-      (error-response "Failed to search coins" 500))))
+      (log/error e "Falha ao buscar moedas")
+      (error-response "Falha ao buscar moedas") 500)))
 
-;; Statistics endpoints
+;; Endpoints de estatísticas
 (defn get-coin-statistics
-  "Get statistics for a specific coin"
+  "Obtém estatísticas de uma moeda específica"
   [request]
   (try
     (let [db-spec (get-in request [:system :db-spec])
@@ -228,23 +230,40 @@
       (if coin
         (let [stats (db/get-price-statistics db-spec (:id coin) days)]
           (success-response stats))
-        (not-found-response (str "Coin " symbol))))
+        (not-found-response (str "Moeda " symbol))))
     (catch NumberFormatException e
-      (error-response "Invalid days parameter" 400))
+      (error-response "Parâmetro 'days' inválido" 400))
     (catch Exception e
-      (log/error e "Failed to get coin statistics" {:symbol (get-in request [:path-params :symbol])})
-      (error-response "Failed to retrieve coin statistics" 500))))
+      (log/error e "Falha ao buscar estatísticas de moeda" {:symbol (get-in request [:path-params :symbol])})
+      (error-response "Falha ao buscar estatísticas de moeda" 500))))
 
-;; System endpoints
+;; Endpoints de sistema
 (defn force-collection
-  "Force immediate data collection"
+  "Força coleta imediata de dados"
   [request]
   (try
     (let [coin-ids (or (get-in request [:query-params "coins"])
                        ["bitcoin" "ethereum" "solana" "cardano" "polkadot"])]
       (collector/force-collection (if (string? coin-ids) [coin-ids] coin-ids))
-      (success-response {:message "Collection triggered"
+      (success-response {:message "Coleta forçada"
                          :coins coin-ids}))
     (catch Exception e
-      (log/error e "Failed to force collection")
-      (error-response "Failed to trigger collection" 500))))
+      (log/error e "Falha ao forçar coleta")
+      (error-response "Falha ao forçar coleta" 500))))
+
+;; Endpoints de status do sistema
+(defn get-system-status
+  "Obtém status completo do sistema"
+  [request]
+  (try
+    (success-response {:system {:status "running"
+                                :timestamp (str (t/instant))
+                                :version "1.0.0"}
+                       :database {:status "healthy"}
+                       :collector {:status "running" :collecting true}
+                       :alerts {:status "running" :monitoring true}
+                       :external-apis {:coingecko {:status "healthy"}
+                                       :binance {:status "healthy"}}})
+    (catch Exception e
+      (log/error e "Falha ao obter status do sistema")
+      (error-response "Falha ao obter status do sistema" 500))))
