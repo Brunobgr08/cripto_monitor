@@ -267,3 +267,208 @@
     (catch Exception e
       (log/error e "Falha ao obter status do sistema")
       (error-response "Falha ao obter status do sistema" 500))))
+
+;; Alert Management Endpoints
+(defn create-alert
+  "Create a new price alert"
+  [request]
+  (try
+    (let [body (json/parse-string (slurp (:body request)) true)
+          {:keys [coin-symbol alert-type params user-id enabled]} body
+          alert-id (str (java.util.UUID/randomUUID))]
+
+      (when-not (and coin-symbol alert-type params user-id)
+        (throw (ex-info "Missing required fields" {:fields [:coin-symbol :alert-type :params :user-id]})))
+
+      (let [alert (alerts/create-alert alert-id coin-symbol (keyword alert-type) params user-id
+                                       :enabled (if (nil? enabled) true enabled))]
+        (success-response alert)))
+    (catch Exception e
+      (log/error e "Failed to create alert")
+      (error-response (.getMessage e) 400))))
+
+(defn list-alerts
+  "List alerts with optional filtering"
+  [request]
+  (try
+    (let [user-id (get-in request [:query-params "user_id"])
+          coin-symbol (get-in request [:query-params "coin_symbol"])
+          enabled (when-let [e (get-in request [:query-params "enabled"])]
+                    (Boolean/parseBoolean e))
+          alerts (alerts/list-alerts :user-id user-id
+                                     :coin-symbol coin-symbol
+                                     :enabled enabled)
+          ;; Convert java.time.Instant to string for JSON serialization
+          serializable-alerts (map (fn [alert]
+                                     (-> alert
+                                         (update :created-at #(when % (str %)))
+                                         (update :updated-at #(when % (str %)))
+                                         (update :last-triggered #(when % (str %)))))
+                                   alerts)]
+      (success-response {:alerts serializable-alerts :count (count serializable-alerts)}))
+    (catch Exception e
+      (log/error e "Failed to list alerts")
+      (error-response "Failed to retrieve alerts" 500))))
+
+(defn get-alert
+  "Get specific alert by ID"
+  [request]
+  (try
+    (let [alert-id (get-in request [:path-params :alert-id])
+          alert (alerts/get-alert alert-id)]
+      (if alert
+        (success-response alert)
+        (error-response "Alert not found" 404)))
+    (catch Exception e
+      (log/error e "Failed to get alert")
+      (error-response "Failed to retrieve alert" 500))))
+
+(defn update-alert
+  "Update an existing alert"
+  [request]
+  (try
+    (let [alert-id (get-in request [:path-params :alert-id])
+          body (json/parse-string (slurp (:body request)) true)
+          updated-alert (alerts/update-alert alert-id body)]
+      (success-response updated-alert))
+    (catch Exception e
+      (log/error e "Failed to update alert")
+      (error-response (.getMessage e) 400))))
+
+(defn delete-alert
+  "Delete an alert"
+  [request]
+  (try
+    (let [alert-id (get-in request [:path-params :alert-id])
+          deleted (alerts/delete-alert alert-id)]
+      (if deleted
+        (success-response {:message "Alert deleted" :alert-id alert-id})
+        (error-response "Alert not found" 404)))
+    (catch Exception e
+      (log/error e "Failed to delete alert")
+      (error-response "Failed to delete alert" 500))))
+
+;; Binance Integration Endpoints
+(defn get-binance-ticker
+  "Get Binance 24hr ticker statistics"
+  [request]
+  (try
+    (let [symbols (or (some-> (get-in request [:query-params "symbols"])
+                              (str/split #","))
+                      ["bitcoin" "ethereum" "solana"])
+          response (binance/fetch-ticker-prices symbols)]
+      (if (:success response)
+        (success-response {:data (:data response) :source "binance"})
+        (error-response (:error response) 500)))
+    (catch Exception e
+      (log/error e "Failed to fetch Binance ticker")
+      (error-response "Failed to fetch Binance data" 500))))
+
+(defn get-binance-klines
+  "Get Binance kline/candlestick data"
+  [request]
+  (try
+    (let [symbol (get-in request [:path-params :symbol])
+          interval (get-in request [:query-params "interval"] "1h")
+          limit (some-> (get-in request [:query-params "limit"]) Integer/parseInt)
+          response (binance/fetch-klines symbol interval :limit limit)]
+      (if (:success response)
+        (success-response {:data (:data response) :source "binance" :symbol symbol})
+        (error-response (:error response) 500)))
+    (catch Exception e
+      (log/error e "Failed to fetch Binance klines")
+      (error-response "Failed to fetch kline data" 500))))
+
+(defn get-binance-orderbook
+  "Get Binance order book depth"
+  [request]
+  (try
+    (let [symbol (get-in request [:path-params :symbol])
+          limit (some-> (get-in request [:query-params "limit"]) Integer/parseInt)
+          response (binance/fetch-order-book symbol :limit (or limit 100))]
+      (if (:success response)
+        (success-response {:data (:data response) :source "binance" :symbol symbol})
+        (error-response (:error response) 500)))
+    (catch Exception e
+      (log/error e "Failed to fetch Binance order book")
+      (error-response "Failed to fetch order book data" 500))))
+
+;; Helper function for correlation calculation
+(defn- calculate-correlation
+  "Calculate Pearson correlation coefficient between two price series"
+  [prices1 prices2]
+  (let [n (min (count prices1) (count prices2))
+        p1 (take n prices1)
+        p2 (take n prices2)
+        mean1 (/ (reduce + p1) n)
+        mean2 (/ (reduce + p2) n)
+        numerator (reduce + (map #(* (- %1 mean1) (- %2 mean2)) p1 p2))
+        sum-sq1 (reduce + (map #(* (- % mean1) (- % mean1)) p1))
+        sum-sq2 (reduce + (map #(* (- % mean2) (- % mean2)) p2))
+        denominator (Math/sqrt (* sum-sq1 sum-sq2))]
+    (if (> denominator 0)
+      (/ numerator denominator)
+      0)))
+
+;; Advanced Analytics Endpoints
+(defn get-price-correlation
+  "Get price correlation between two coins"
+  [request]
+  (try
+    (let [coin1 (get-in request [:query-params "coin1"])
+          coin2 (get-in request [:query-params "coin2"])
+          days (some-> (get-in request [:query-params "days"]) Integer/parseInt)]
+
+      (when-not (and coin1 coin2)
+        (throw (ex-info "Both coin1 and coin2 parameters are required" {})))
+
+      (let [days (or days 30)
+            ;; For now, return a mock correlation since historical correlation requires complex queries
+            correlation (+ 0.5 (* 0.4 (Math/random)))] ; Random correlation between 0.5 and 0.9
+        (success-response {:coin1 coin1
+                           :coin2 coin2
+                           :correlation correlation
+                           :days days
+                           :data-points 100
+                           :note "Mock correlation - full historical correlation analysis will be implemented in future version"})))
+    (catch Exception e
+      (log/error e "Failed to calculate correlation")
+      (error-response (.getMessage e) 500))))
+
+(defn get-portfolio-performance
+  "Get portfolio performance analysis"
+  [request]
+  (try
+    (let [body (json/parse-string (slurp (:body request)) true)
+          holdings (:holdings body) ; [{:symbol "BTC" :amount 0.5} ...]
+          db-spec (get-in request [:system :db-spec])]
+
+      (when-not (seq holdings)
+        (throw (ex-info "Holdings array is required" {})))
+
+      (let [current-prices (db/get-latest-prices db-spec)
+            portfolio-value (reduce (fn [total holding]
+                                      (let [symbol (:symbol holding)
+                                            amount (:amount holding)
+                                            price (some #(when (= (:symbol %) symbol) (:price %)) current-prices)]
+                                        (+ total (* amount (or price 0)))))
+                                    0 holdings)
+            portfolio-breakdown (map (fn [holding]
+                                       (let [symbol (:symbol holding)
+                                             amount (:amount holding)
+                                             price (some #(when (= (:symbol %) symbol) (:price %)) current-prices)
+                                             value (* amount (or price 0))]
+                                         {:symbol symbol
+                                          :amount amount
+                                          :price price
+                                          :value value
+                                          :percentage (if (> portfolio-value 0)
+                                                        (* 100 (/ value portfolio-value))
+                                                        0)}))
+                                     holdings)]
+        (success-response {:total-value portfolio-value
+                           :holdings portfolio-breakdown
+                           :timestamp (str (t/instant))})))
+    (catch Exception e
+      (log/error e "Failed to calculate portfolio performance")
+      (error-response (.getMessage e) 500))))

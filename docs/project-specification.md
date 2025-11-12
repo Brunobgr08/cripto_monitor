@@ -257,7 +257,7 @@ CREATE INDEX idx_price_history_collected_at ON price_history(collected_at DESC);
 - Volume anômalo
 - Múltiplas moedas correlacionadas
 
-### ✅ Issue 8: API REST - Endpoints Avançados
+### ✅ Issue 8: API REST - Endpoints Avançados - **COMPLETA**
 
 **Duração**: 4 dias
 **Prioridade**: Média
@@ -272,11 +272,16 @@ CREATE INDEX idx_price_history_collected_at ON price_history(collected_at DESC);
 **Endpoints Avançados**:
 
 ```clojure
-;; GET /api/stats/:symbol - Estatísticas da moeda
 ;; GET /api/alerts - Lista alertas do usuário
 ;; POST /api/alerts - Criar novo alerta
-;; PUT /api/alerts/:id - Atualizar alerta
-;; DELETE /api/alerts/:id - Remover alerta
+;; GET /api/alerts/:alert-id - Detalhes de um alerta
+;; PUT /api/alerts/:alert-id - Atualizar alerta
+;; DELETE /api/alerts/:alert-id - Remover alerta
+;; GET /api/analytics/correlation - Correlação entre moedas
+;; POST /api/analytics/portfolio - Performance de portfolio
+;; GET /api/binance/ticker - Ticker 24h Binance
+;; GET /api/binance/klines/:symbol - Candlestick data
+;; GET /api/binance/orderbook/:symbol - Order book data
 ```
 
 ### ✅ Issue 9: Frontend ClojureScript

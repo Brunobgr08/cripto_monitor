@@ -7,6 +7,11 @@
             [reitit.ring :as reitit-ring]
             [reitit.swagger :as swagger]
             [reitit.swagger-ui :as swagger-ui]
+            [reitit.coercion.spec]
+            [reitit.ring.coercion :as coercion]
+            [reitit.ring.middleware.muuntaja :as muuntaja]
+            [reitit.ring.middleware.parameters :as parameters]
+            [muuntaja.core :as m]
             [cheshire.core :as cheshire]
             [taoensso.timbre :as log]
             [cripto-monitor.config :as config]
@@ -66,191 +71,156 @@
         response))))
 
 (defn create-routes
-  "Criando rotas com documentação OpenAPI"
+  "Criando rotas com documentação Swagger organizadas por categoria"
   []
-  [["" {:no-doc true}
-    ["/swagger.json" {:get (swagger/create-swagger-handler
-                            {:info specs/openapi-info
-                             :servers specs/openapi-servers
-                             :tags specs/openapi-tags})}]]
+  [;; Swagger documentation routes
+   ["/swagger.json" {:get {:no-doc true
+                           :swagger specs/swagger-info
+                           :handler (swagger/create-swagger-handler)}}]
 
-   ["/api-docs/*" {:no-doc true
-                   :get (swagger-ui/create-swagger-ui-handler
-                         {:url "/swagger.json"
-                          :config {:validatorUrl nil}})}]
+   ["/api-docs/*" {:get {:no-doc true
+                         :handler (swagger-ui/create-swagger-ui-handler
+                                   {:url "/swagger.json"
+                                    :config {:validatorUrl nil}})}}]
 
-   ["/api"
-    ["/health" {:get {:handler handlers/health-check
-                      :summary "Verificação de saúde do sistema"
-                      :description "Verifica o status do banco de dados, collector e outros componentes"
-                      :tags ["health"]
-                      :responses {200 {:description "Sistema saudável"
-                                       :content {"application/json" {:schema {:allOf [specs/success-response-schema
-                                                                                       {:properties {:data specs/health-schema}}]}}}}
-                                  503 {:description "Sistema com problemas"
-                                       :content {"application/json" {:schema specs/error-response-schema}}}}}
-                :name ::health}]
+   ;; ============================================================================
+   ;; HEALTH ENDPOINTS
+   ;; ============================================================================
+   ["/api/health" {:swagger {:tags ["health"]}
+                   :get (merge {:handler handlers/health-check
+                               :name ::health}
+                               (get specs/route-docs ::health))}]
 
-    ["/coins" {:get {:handler handlers/get-all-coins
-                     :summary "Lista todas as moedas"
-                     :description "Retorna lista de todas as criptomoedas disponíveis no sistema"
-                     :tags ["coins"]
-                     :responses {200 {:description "Lista de moedas"
-                                      :content {"application/json" {:schema {:allOf [specs/success-response-schema
-                                                                                      {:properties {:data {:type "array"
-                                                                                                           :items specs/coin-schema}}}]}}}}
-                                 500 {:description "Erro interno"
-                                      :content {"application/json" {:schema specs/error-response-schema}}}}}
-               :name ::all-coins}]
+   ;; ============================================================================
+   ;; COINS ENDPOINTS
+   ;; ============================================================================
+   ["/api/coins" {:swagger {:tags ["coins"]}
+                  :get (merge {:handler handlers/get-all-coins
+                               :name ::all-coins}
+                               (get specs/route-docs ::all-coins))}]
 
-    ["/coins/:symbol" {:get {:handler handlers/get-coin-by-symbol
-                             :summary "Busca moeda por símbolo"
-                             :description "Retorna informações de uma moeda específica pelo símbolo"
-                             :tags ["coins"]
-                             :parameters [specs/symbol-path-param]
-                             :responses {200 {:description "Moeda encontrada"
-                                              :content {"application/json" {:schema {:allOf [specs/success-response-schema
-                                                                                              {:properties {:data specs/coin-schema}}]}}}}
-                                         404 {:description "Moeda não encontrada"
-                                              :content {"application/json" {:schema specs/error-response-schema}}}
-                                         500 {:description "Erro interno"
-                                              :content {"application/json" {:schema specs/error-response-schema}}}}}
-                       :name ::coin-by-symbol}]
+   ["/api/coins/:symbol" {:swagger {:tags ["coins"]}
+                          :get (merge {:handler handlers/get-coin-by-symbol
+                                       :name ::coin-by-symbol}
+                                       (get specs/route-docs ::coin-by-symbol))}]
 
-    ["/search/coins" {:get {:handler handlers/search-coins
-                            :summary "Busca moedas"
-                            :description "Busca moedas por nome ou símbolo"
-                            :tags ["search"]
-                            :parameters [specs/search-query-param]
-                            :responses {200 {:description "Resultados da busca"
-                                             :content {"application/json" {:schema specs/success-response-schema}}}
-                                        400 {:description "Parâmetros inválidos"
-                                             :content {"application/json" {:schema specs/error-response-schema}}}
-                                        500 {:description "Erro interno"
-                                             :content {"application/json" {:schema specs/error-response-schema}}}}}
-                      :name ::search-coins}]
+   ;; ============================================================================
+   ;; SEARCH ENDPOINTS
+   ;; ============================================================================
+   ["/api/search/coins" {:swagger {:tags ["search"]}
+                         :get (merge {:handler handlers/search-coins
+                                      :name ::search-coins}
+                                      (get specs/route-docs ::search-coins))}]
 
-    ["/prices"
-     ["/current" {:get {:handler handlers/get-current-prices
-                        :summary "Preços atuais"
-                        :description "Retorna os preços atuais de todas as moedas"
-                        :tags ["prices"]
-                        :responses {200 {:description "Preços atuais"
-                                         :content {"application/json" {:schema {:allOf [specs/success-response-schema
-                                                                                         {:properties {:data {:type "array"
-                                                                                                              :items specs/price-schema}}}]}}}}
-                                    500 {:description "Erro interno"
-                                         :content {"application/json" {:schema specs/error-response-schema}}}}}
-                  :name ::current-prices}]
+   ;; ============================================================================
+   ;; PRICES ENDPOINTS
+   ;; ============================================================================
+   ["/api/prices/current" {:swagger {:tags ["prices"]}
+                           :get (merge {:handler handlers/get-current-prices
+                                         :name ::current-prices}
+                                         (get specs/route-docs ::current-prices))}]
 
-     ["/current/:symbol" {:get {:handler handlers/get-current-price-by-symbol
-                                :summary "Preço atual por símbolo"
-                                :description "Retorna o preço atual de uma moeda específica"
-                                :tags ["prices"]
-                                :parameters [specs/symbol-path-param]
-                                :responses {200 {:description "Preço atual"
-                                                 :content {"application/json" {:schema {:allOf [specs/success-response-schema
-                                                                                                 {:properties {:data specs/price-schema}}]}}}}
-                                            404 {:description "Moeda não encontrada"
-                                                 :content {"application/json" {:schema specs/error-response-schema}}}
-                                            500 {:description "Erro interno"
-                                                 :content {"application/json" {:schema specs/error-response-schema}}}}}
-                          :name ::current-price-by-symbol}]
+   ["/api/prices/current/:symbol" {:swagger {:tags ["prices"]}
+                                   :get (merge {:handler handlers/get-current-price-by-symbol
+                                                 :name ::current-price-by-symbol}
+                                                 (get specs/route-docs ::current-price-by-symbol))}]
 
-     ["/history/:symbol" {:get {:handler handlers/get-price-history
-                                :summary "Histórico de preços"
-                                :description "Retorna o histórico de preços de uma moeda"
-                                :tags ["prices"]
-                                :parameters [specs/symbol-path-param
-                                             specs/days-query-param
-                                             specs/limit-query-param]
-                                :responses {200 {:description "Histórico de preços"
-                                                 :content {"application/json" {:schema specs/success-response-schema}}}
-                                            400 {:description "Parâmetros inválidos"
-                                                 :content {"application/json" {:schema specs/error-response-schema}}}
-                                            404 {:description "Moeda não encontrada"
-                                                 :content {"application/json" {:schema specs/error-response-schema}}}
-                                            500 {:description "Erro interno"
-                                                 :content {"application/json" {:schema specs/error-response-schema}}}}}
-                         :name ::price-history}]]
+   ["/api/prices/history/:symbol" {:swagger {:tags ["prices"]}
+                                   :get (merge {:handler handlers/get-price-history
+                                                 :name ::price-history}
+                                                 (get specs/route-docs ::price-history))}]
 
-    ["/market"
-     ["/overview" {:get {:handler handlers/get-market-overview
-                         :summary "Visão geral do mercado"
-                         :description "Retorna estatísticas gerais do mercado de criptomoedas"
-                         :tags ["market"]
-                         :responses {200 {:description "Visão geral do mercado"
-                                          :content {"application/json" {:schema specs/success-response-schema}}}
-                                     500 {:description "Erro interno"
-                                          :content {"application/json" {:schema specs/error-response-schema}}}}}
-                   :name ::market-overview}]
+   ;; ============================================================================
+   ;; MARKET ENDPOINTS
+   ;; ============================================================================
+   ["/api/market/overview" {:swagger {:tags ["market"]}
+                            :get (merge {:handler handlers/get-market-overview
+                                         :name ::market-overview}
+                                         (get specs/route-docs ::market-overview))}]
 
-     ["/gainers" {:get {:handler handlers/get-top-gainers
-                        :summary "Maiores altas"
-                        :description "Retorna as moedas com maiores ganhos em 24h"
-                        :tags ["market"]
-                        :parameters [specs/limit-query-param]
-                        :responses {200 {:description "Maiores altas"
-                                         :content {"application/json" {:schema {:allOf [specs/success-response-schema
-                                                                                         {:properties {:data {:type "array"
-                                                                                                              :items specs/price-schema}}}]}}}}
-                                    500 {:description "Erro interno"
-                                         :content {"application/json" {:schema specs/error-response-schema}}}}}
-                  :name ::top-gainers}]
+   ["/api/market/gainers" {:swagger {:tags ["market"]}
+                           :get (merge {:handler handlers/get-top-gainers
+                                         :name ::top-gainers}
+                                         (get specs/route-docs ::top-gainers))}]
 
-     ["/losers" {:get {:handler handlers/get-top-losers
-                       :summary "Maiores baixas"
-                       :description "Retorna as moedas com maiores perdas em 24h"
-                       :tags ["market"]
-                       :parameters [specs/limit-query-param]
-                       :responses {200 {:description "Maiores baixas"
-                                        :content {"application/json" {:schema {:allOf [specs/success-response-schema
-                                                                                        {:properties {:data {:type "array"
-                                                                                                             :items specs/price-schema}}}]}}}}
-                                   500 {:description "Erro interno"
-                                        :content {"application/json" {:schema specs/error-response-schema}}}}}
-                 :name ::top-losers}]]
+   ["/api/market/losers" {:swagger {:tags ["market"]}
+                          :get (merge {:handler handlers/get-top-losers
+                                        :name ::top-losers}
+                                        (get specs/route-docs ::top-losers))}]
 
-    ["/stats/:symbol" {:get {:handler handlers/get-coin-statistics
-                             :summary "Estatísticas da moeda"
-                             :description "Retorna estatísticas detalhadas de uma moeda"
-                             :tags ["coins"]
-                             :parameters [specs/symbol-path-param]
-                             :responses {200 {:description "Estatísticas da moeda"
-                                              :content {"application/json" {:schema specs/success-response-schema}}}
-                                         404 {:description "Moeda não encontrada"
-                                              :content {"application/json" {:schema specs/error-response-schema}}}
-                                         500 {:description "Erro interno"
-                                              :content {"application/json" {:schema specs/error-response-schema}}}}}
-                       :name ::coin-statistics}]
+   ;; ============================================================================
+   ;; ANALYTICS ENDPOINTS
+   ;; ============================================================================
+   ["/api/analytics/correlation" {:swagger {:tags ["analytics"]}
+                                   :get (merge {:handler handlers/get-price-correlation
+                                                 :name ::price-correlation}
+                                                 (get specs/route-docs ::price-correlation))}]
 
-    ["/system"
-     ["/collect" {:post {:handler handlers/force-collection
-                         :summary "Força coleta de dados"
-                         :description "Força uma coleta imediata de dados das APIs externas"
-                         :tags ["system"]
-                         :parameters [{:name "coins"
-                                       :in "query"
-                                       :required false
-                                       :description "Lista de moedas para coletar (padrão: todas)"
-                                       :schema {:type "array"
-                                                :items {:type "string"}
-                                                :example ["bitcoin", "ethereum"]}}]
-                         :responses {200 {:description "Coleta iniciada"
-                                          :content {"application/json" {:schema specs/success-response-schema}}}
-                                     500 {:description "Erro interno"
-                                          :content {"application/json" {:schema specs/error-response-schema}}}}}
-                  :name ::force-collection}]
+   ["/api/analytics/portfolio" {:swagger {:tags ["analytics"]}
+                                :post (merge {:handler handlers/get-portfolio-performance
+                                               :name ::portfolio-performance}
+                                               (get specs/route-docs ::portfolio-performance))}]
 
-     ["/status" {:get {:handler handlers/get-system-status
-                       :summary "Status do sistema"
-                       :description "Retorna o status completo do sistema"
-                       :tags ["system"]
-                       :responses {200 {:description "Status do sistema"
-                                        :content {"application/json" {:schema specs/success-response-schema}}}
-                                   500 {:description "Erro interno"
-                                        :content {"application/json" {:schema specs/error-response-schema}}}}}
-                 :name ::system-status}]]]])
+   ;; ============================================================================
+   ;; STATISTICS ENDPOINTS
+   ;; ============================================================================
+   ["/api/stats/:symbol" {:swagger {:tags ["analytics"]}
+                          :get (merge {:handler handlers/get-coin-statistics
+                                       :name ::coin-statistics}
+                                       (get specs/route-docs ::coin-statistics))}]
+
+   ;; ============================================================================
+   ;; SYSTEM ENDPOINTS
+   ;; ============================================================================
+   ["/api/system/collect" {:swagger {:tags ["system"]}
+                           :post (merge {:handler handlers/force-collection
+                                         :name ::force-collection}
+                                         (get specs/route-docs ::force-collection))}]
+
+   ["/api/system/status" {:swagger {:tags ["system"]}
+                          :get (merge {:handler handlers/get-system-status
+                                       :name ::system-status}
+                                       (get specs/route-docs ::system-status))}]
+
+   ;; ============================================================================
+   ;; ALERTS ENDPOINTS
+   ;; ============================================================================
+   ["/api/alerts" {:swagger {:tags ["alerts"]}
+                   :get (merge {:handler handlers/list-alerts
+                                :name ::list-alerts}
+                                (get specs/route-docs ::list-alerts))
+                   :post (merge {:handler handlers/create-alert
+                                 :name ::create-alert}
+                                 (get specs/route-docs ::create-alert))}]
+
+   ["/api/alerts/:alert-id" {:swagger {:tags ["alerts"]}
+                             :get (merge {:handler handlers/get-alert
+                                         :name ::get-alert}
+                                         (get specs/route-docs ::get-alert))
+                             :put (merge {:handler handlers/update-alert
+                                         :name ::update-alert}
+                                         (get specs/route-docs ::update-alert))
+                             :delete (merge {:handler handlers/delete-alert
+                                             :name ::delete-alert}
+                                             (get specs/route-docs ::delete-alert))}]
+
+   ;; ============================================================================
+   ;; BINANCE ENDPOINTS
+   ;; ============================================================================
+   ["/api/binance/ticker" {:swagger {:tags ["binance"]}
+                           :get (merge {:handler handlers/get-binance-ticker
+                                        :name ::binance-ticker}
+                                        (get specs/route-docs ::binance-ticker))}]
+
+   ["/api/binance/klines/:symbol" {:swagger {:tags ["binance"]}
+                                   :get (merge {:handler handlers/get-binance-klines
+                                                 :name ::binance-klines}
+                                                 (get specs/route-docs ::binance-klines))}]
+
+   ["/api/binance/orderbook/:symbol" {:swagger {:tags ["binance"]}
+                                      :get (merge {:handler handlers/get-binance-orderbook
+                                                    :name ::binance-orderbook}
+                                                    (get specs/route-docs ::binance-orderbook))}]])
 
 (defn wrap-system
   "Middleware para injetar sistema nas requisições."
@@ -259,10 +229,25 @@
     (handler (assoc request :system system))))
 
 (defn create-app
-  "Criando aplicação com Ring"
+  "Criando aplicação com Ring e Swagger"
   [system]
-  (let [;; Criando router
-        router (reitit-ring/router (create-routes))
+  (let [;; Criando router com middleware para Swagger
+        router (reitit-ring/router
+                (create-routes)
+                {:data {:coercion reitit.coercion.spec/coercion
+                        :muuntaja m/instance
+                        :middleware [;; query-params & form-params
+                                     parameters/parameters-middleware
+                                     ;; content-negotiation
+                                     muuntaja/format-negotiate-middleware
+                                     ;; encoding response body
+                                     muuntaja/format-response-middleware
+                                     ;; decoding request body
+                                     muuntaja/format-request-middleware
+                                     ;; coercing response bodys
+                                     coercion/coerce-response-middleware
+                                     ;; coercing request parameters
+                                     coercion/coerce-request-middleware]}})
 
         ;; Criando handler principal
         app (reitit-ring/ring-handler
