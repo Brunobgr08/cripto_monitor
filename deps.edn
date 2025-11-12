@@ -8,6 +8,8 @@
         metosin/reitit-ring {:mvn/version "0.7.0"}
         metosin/reitit-swagger {:mvn/version "0.7.0"}
         metosin/reitit-swagger-ui {:mvn/version "0.7.0"}
+        metosin/reitit-spec {:mvn/version "0.7.0"}
+
         metosin/muuntaja {:mvn/version "0.6.10"}
 
         ring/ring-core {:mvn/version "1.10.0"}
