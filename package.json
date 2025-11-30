@@ -1,0 +1,34 @@
+{
+  "name": "cripto-monitor-frontend",
+  "version": "1.0.0",
+  "description": "Frontend ClojureScript para o Cripto Monitor",
+  "main": "index.js",
+  "scripts": {
+    "dev": "shadow-cljs watch app",
+    "build": "shadow-cljs release app",
+    "test": "shadow-cljs compile test",
+    "clean": "shadow-cljs clean",
+    "server": "shadow-cljs server"
+  },
+  "keywords": [
+    "clojurescript",
+    "reagent",
+    "re-frame",
+    "cryptocurrency",
+    "dashboard"
+  ],
+  "author": "Cripto Monitor Team",
+  "license": "MIT",
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "recharts": "^2.8.0"
+  },
+  "devDependencies": {
+    "shadow-cljs": "^2.25.10"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  }
+}

@@ -284,7 +284,7 @@ CREATE INDEX idx_price_history_collected_at ON price_history(collected_at DESC);
 ;; GET /api/binance/orderbook/:symbol - Order book data
 ```
 
-### ✅ Issue 9: Frontend ClojureScript
+### ✅ Issue 9: Frontend ClojureScript - **COMPLETA**
 
 **Duração**: 8 dias
 **Prioridade**: Baixa
